@@ -46,11 +46,17 @@ def prepPlot():
     plt.title("Matern Kernel", fontsize = 16, pad = 20, loc="center")
 
 def f(x):
-    print(f"X: {np.array(x)}")
-    y = gp_model.predict(x) #This line of code is not working as expected
-    print(f"Prediction: {y[0]}")
-    print(f"Result: {abs(normalize(target,300,900)-y[0])}")
-    return abs(normalize(target,300,900)-y[0])
+    print(f"X: {np.array(x[0][0])}")
+    X_denormalized = denormalize(x[0][0],0,0.002)
+    print(f"Concentration {X_denormalized}")
+    y = gp_model.predict(x) 
+    print(f"Prediction: {y[0][0][0]}")
+    Y_denormalized = denormalize(y[0][0][0],300,900)
+    print(f"Denormalized Prediction: {Y_denormalized}")
+    result = abs(target - Y_denormalized)
+    print(f"Target - Prediction: {result}")
+    print("===")
+    return result
 
 def normalize(x, min_val, max_val):
     return (x - min_val) / (max_val - min_val)
@@ -66,36 +72,33 @@ Y_normalized = normalize(Y, 300, 900)
 domain = [{'name': 'x', 'type': 'continuous', 'domain': (0, 1)}]
 space = GPyOpt.core.task.space.Design_space(domain)
 
-Exponential = GPy.kern.Exponential(1,lengthscale=0.1)
+Exponential = GPy.kern.Exponential(1)
 Radial = GPy.kern.RBF(1)
-Matern32 = GPy.kern.Matern32(1)
+Matern32 = GPy.kern.Matern32(1, lengthscale=1, variance=1)
 
-gp_model = GPyOpt.models.GPModel(kernel=Exponential, noise_var=0, optimize_restarts=10, verbose=False)
+gp_model = GPyOpt.models.GPModel(kernel=Matern32, noise_var=1e-4, optimize_restarts=0, verbose=False)
 gp_model.updateModel(X_normalized, Y_normalized, None, None)
 acq_optimizer = GPyOpt.optimization.AcquisitionOptimizer(space, optimizer="lbfgs")
 
-MPI = GPyOpt.acquisitions.AcquisitionMPI(gp_model,space,acq_optimizer,jitter=1e-6)
-LCB_Explore = GPyOpt.acquisitions.AcquisitionLCB(gp_model,space,acq_optimizer,exploration_weight=10)
-LCB_Exploit = GPyOpt.acquisitions.AcquisitionLCB(gp_model,space,acq_optimizer,exploration_weight=2)
+EI = GPyOpt.acquisitions.AcquisitionEI(gp_model,space,acq_optimizer)
+MPI = GPyOpt.acquisitions.AcquisitionMPI(gp_model,space,acq_optimizer,jitter=0.01)
+LCB_Explore = GPyOpt.acquisitions.AcquisitionLCB(gp_model,space,acq_optimizer,exploration_weight=15)
+LCB_Exploit = GPyOpt.acquisitions.AcquisitionLCB(gp_model,space,acq_optimizer,exploration_weight=5)
 
 objective = GPyOpt.core.task.objective.SingleObjective(f)
 evaluator = GPyOpt.core.evaluators.Sequential(MPI)
-model = GPyOpt.methods.ModularBayesianOptimization(objective=objective,model=gp_model,space=space,acquisition=LCB_Explore,evaluator=evaluator,X_init=X_normalized,Y_init=Y_normalized, normalize_Y=False)
+model = GPyOpt.methods.ModularBayesianOptimization(objective=objective,model=gp_model,space=space,acquisition=MPI,evaluator=evaluator,X_init=X_normalized,Y_init=Y_normalized, normalize_Y=False)
 
 predictions, stdev = getPredictions()
-
 predictions = denormalize(np.array(predictions).flatten(),300, 900)
 stdev = np.array(stdev).flatten()*(600)
 
-model.run_optimization(10)
+model.run_optimization(5)
 
-print(denormalize(model.suggest_next_locations()[0][0],0,0.002))
+next = denormalize(model.suggest_next_locations()[0][0],0,0.002)
+print(next)
 
 linespace = np.linspace(0,0.002,200).tolist()
-
-plt.scatter(linespace, stdev)
-plt.tight_layout()
-plt.show()
 
 prepPlot()
 
@@ -105,7 +108,7 @@ plt.fill_between(
     predictions - stdev,
     alpha = 0.3
 )
-
+plt.scatter(next,550)
 plt.plot(linespace, predictions)
 plt.scatter(X,Y)
 plt.tight_layout()
