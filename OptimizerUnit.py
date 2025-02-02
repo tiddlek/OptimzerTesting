@@ -4,8 +4,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-target = 600
+target = 550
 
 def parseData(filename):
     data = pd.read_csv(filename)
@@ -92,7 +91,7 @@ plt.fill_between(
     alpha = 0.3
 )
 
-plt.scatter(best,target)
+plt.scatter(best,target,s=25)
 plt.plot(linespace.tolist(), predictions)
 plt.scatter(X,Y, c="#2ca02c",s=25)
 plt.tight_layout()
