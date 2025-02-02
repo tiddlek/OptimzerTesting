@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-target = 550
+target = 600
 
 def parseData(filename):
     data = pd.read_csv(filename)
@@ -77,8 +77,11 @@ model = GPyOpt.methods.ModularBayesianOptimization(objective=objective,model=gp_
 predictions, stdev = getPredictions()
 predictions = denormalize(np.array(predictions).flatten(),300, 900)
 stdev = np.array(stdev).flatten()*(600)
+linespace = np.linspace(0,0.002,200)
 
-linespace = np.linspace(0,0.002,200).tolist()
+closest = np.argmin(np.abs(predictions - target))
+best = linespace.reshape(-1,1)[closest][0]
+print(best)
 
 prepPlot()
 
@@ -89,7 +92,8 @@ plt.fill_between(
     alpha = 0.3
 )
 
-plt.plot(linespace, predictions)
+plt.scatter(best,target)
+plt.plot(linespace.tolist(), predictions)
 plt.scatter(X,Y, c="#2ca02c",s=25)
 plt.tight_layout()
 plt.show()
